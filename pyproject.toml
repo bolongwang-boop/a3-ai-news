@@ -1,7 +1,7 @@
 [project]
 name = "ai-news-api"
-version = "1.0.0"
-description = "API that retrieves authenticated AI news from the last week (Australia/Sydney timezone)"
+version = "2.0.0"
+description = "API that retrieves authenticated AI news from the last week (Australia/Sydney timezone) with PostgreSQL persistence and Slack Block Kit output"
 requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.115.0",
@@ -10,6 +10,9 @@ dependencies = [
     "pydantic>=2.0",
     "pydantic-settings>=2.0",
     "feedparser>=6.0",
+    "sqlalchemy[asyncio]>=2.0",
+    "asyncpg>=0.29.0",
+    "alembic>=1.13.0",
 ]
 
 [project.optional-dependencies]

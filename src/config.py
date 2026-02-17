@@ -8,6 +8,13 @@ class Settings(BaseSettings):
     default_days_back: int = 7
     cache_ttl_minutes: int = 30
 
+    # Database
+    database_url: str | None = None
+    enable_persistence: bool = False
+    database_pool_size: int = 5
+    database_max_overflow: int = 10
+    retention_days: int = 30
+
     credible_domains: list[str] = [
         # Wire services
         "reuters.com",
@@ -44,6 +51,12 @@ class Settings(BaseSettings):
         "cnbc.com",
         "businessinsider.com",
         "forbes.com",
+        # AI companies (official announcements)
+        "openai.com",
+        "deepmind.google",
+        "anthropic.com",
+        "arxiv.org",
+        "huggingface.co",
     ]
 
     model_config = {"env_file": ".env", "env_prefix": "AINEWS_"}

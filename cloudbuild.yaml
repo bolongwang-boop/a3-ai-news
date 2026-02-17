@@ -1,0 +1,79 @@
+# Cloud Build configuration for a3-ai-news Cloud Run service
+#
+# Deploys the AI News API as a Cloud Run service behind a3-auth-proxy.
+#
+# Trigger this build manually:
+#   gcloud builds submit --config=cloudbuild.yaml .
+#
+# Access path:
+#   n8n -> a3-auth-proxy -> Cloud Run (a3-ai-news) via OIDC
+
+substitutions:
+  _REGION: australia-southeast1
+  _SERVICE_NAME: a3-ai-news
+  _SERVICE_ACCOUNT: ''  # Set from terraform output
+
+steps:
+  # Step 1: Build the container image
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'build'
+    args:
+      - 'build'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/${_SERVICE_NAME}'
+      - '.'
+
+  # Step 2: Push the container image to GCR
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'push'
+    waitFor: ['build']
+    args:
+      - 'push'
+      - 'gcr.io/$PROJECT_ID/${_SERVICE_NAME}'
+
+  # Step 3: Run database migrations
+  - name: 'gcr.io/$PROJECT_ID/${_SERVICE_NAME}'
+    id: 'migrate'
+    waitFor: ['push']
+    entrypoint: 'python'
+    args:
+      - '-m'
+      - 'alembic'
+      - 'upgrade'
+      - 'head'
+    secretEnv: ['AINEWS_DATABASE_URL']
+
+  # Step 4: Deploy to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'deploy'
+    waitFor: ['migrate']
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        SA_FLAG=""
+        if [ -n "${_SERVICE_ACCOUNT}" ]; then
+          SA_FLAG="--service-account=${_SERVICE_ACCOUNT}"
+        fi
+
+        gcloud run deploy ${_SERVICE_NAME} \
+          --project=$PROJECT_ID \
+          --region=${_REGION} \
+          --image=gcr.io/$PROJECT_ID/${_SERVICE_NAME} \
+          --no-allow-unauthenticated \
+          --memory=512Mi \
+          --timeout=60s \
+          --vpc-connector=a3-ai-news-connector \
+          --set-secrets=AINEWS_DATABASE_URL=a3-ai-news-database-url:latest,AINEWS_NEWSAPI_KEY=a3-ai-news-newsapi-key:latest \
+          --ingress=internal-and-cloud-load-balancing \
+          $$SA_FLAG
+
+availableSecrets:
+  secretManager:
+    - versionName: projects/$PROJECT_ID/secrets/a3-ai-news-database-url/versions/latest
+      env: 'AINEWS_DATABASE_URL'
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+
+timeout: '600s'

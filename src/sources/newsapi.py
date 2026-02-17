@@ -12,7 +12,8 @@ logger = logging.getLogger(__name__)
 AI_QUERY = (
     '"artificial intelligence" OR "AI" OR "machine learning" '
     'OR "deep learning" OR "large language model" OR "LLM" '
-    'OR "GPT" OR "neural network" OR "generative AI"'
+    'OR "GPT" OR "neural network" OR "generative AI" '
+    'OR "transformer model" OR "ChatGPT" OR "Claude AI"'
 )
 
 

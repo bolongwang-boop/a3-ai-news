@@ -41,6 +41,11 @@ _DOMAIN_TO_NAME = {
     "cnbc.com": "CNBC",
     "businessinsider.com": "Business Insider",
     "forbes.com": "Forbes",
+    "openai.com": "OpenAI",
+    "deepmind.google": "Google DeepMind",
+    "anthropic.com": "Anthropic",
+    "arxiv.org": "arXiv",
+    "huggingface.co": "Hugging Face",
 }
 
 # Build a reverse lookup: lowered source name -> credible
@@ -48,9 +53,15 @@ _CREDIBLE_NAMES = {name.lower() for name in _DOMAIN_TO_NAME.values()}
 
 
 class NewsAggregator:
-    def __init__(self, sources: list[NewsSource], settings: Settings) -> None:
+    def __init__(
+        self,
+        sources: list[NewsSource],
+        settings: Settings,
+        repository=None,
+    ) -> None:
         self._sources = sources
         self._credible_domains = set(settings.credible_domains)
+        self._repository = repository
 
     @property
     def available_sources(self) -> list[NewsSource]:
@@ -88,6 +99,13 @@ class NewsAggregator:
         articles = self._deduplicate(articles)
         articles = self._mark_credibility(articles)
 
+        # Persist to database if available
+        if self._repository is not None:
+            try:
+                await self._repository.upsert_articles(articles)
+            except Exception:
+                logger.exception("Failed to persist articles to database")
+
         if credible_only:
             articles = [a for a in articles if a.source.is_credible]
 
@@ -104,6 +122,36 @@ class NewsAggregator:
             to_date_sydney=utc_to_sydney_str(to_utc),
             sources_queried=sources_queried,
             articles=paginated,
+        )
+
+    async def fetch_from_database(
+        self,
+        days_back: int = 7,
+        credible_only: bool = True,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> NewsResponse:
+        """Fetch articles from the database (cached/persisted data)."""
+        if self._repository is None:
+            raise RuntimeError("Database persistence is not enabled")
+
+        from_utc, to_utc = get_week_range_sydney(days_back)
+
+        total, articles = await self._repository.get_articles(
+            from_date=from_utc,
+            to_date=to_utc,
+            credible_only=credible_only,
+            limit=limit,
+            offset=offset,
+        )
+
+        return NewsResponse(
+            total_articles=total,
+            query="AI news (cached, Sydney time)",
+            from_date_sydney=utc_to_sydney_str(from_utc),
+            to_date_sydney=utc_to_sydney_str(to_utc),
+            sources_queried=["database"],
+            articles=articles,
         )
 
     def _deduplicate(self, articles: list[Article]) -> list[Article]:
