@@ -4,6 +4,10 @@ locals {
   region       = "australia-southeast1"
   service_name = local.base_name
 
+  # GitHub repository (for Cloud Build trigger)
+  github_owner = "bolongwang-boop"
+  github_repo  = "a3-ai-news"
+
   # Database configuration
   db_name     = "ai_news"
   db_tier     = "db-f1-micro"

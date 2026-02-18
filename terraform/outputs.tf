@@ -32,3 +32,8 @@ output "vpc_connector_name" {
   description = "VPC access connector for Cloud Run"
   value       = google_vpc_access_connector.connector.name
 }
+
+output "cloudbuild_trigger_id" {
+  description = "Cloud Build trigger ID for main branch deployments"
+  value       = google_cloudbuild_trigger.deploy.trigger_id
+}

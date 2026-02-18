@@ -1,0 +1,66 @@
+# ============================================================================
+# CLOUD BUILD - GitHub trigger for continuous deployment
+# ============================================================================
+
+# Fetch project number for the default Cloud Build service account
+data "google_project" "project" {
+  project_id = local.project_id
+}
+
+# Cloud Build trigger: deploy on every push to main
+resource "google_cloudbuild_trigger" "deploy" {
+  name     = "${local.service_name}-deploy"
+  project  = local.project_id
+  location = local.region
+
+  github {
+    owner = local.github_owner
+    name  = local.github_repo
+
+    push {
+      branch = "^main$"
+    }
+  }
+
+  filename = "cloudbuild.yaml"
+
+  substitutions = {
+    _REGION          = local.region
+    _SERVICE_NAME    = local.service_name
+    _SERVICE_ACCOUNT = google_service_account.ai_news.email
+  }
+
+  depends_on = [google_project_service.apis["cloudbuild.googleapis.com"]]
+}
+
+# ============================================================================
+# IAM - Grant Cloud Build service account permissions to deploy
+# ============================================================================
+
+# Cloud Build needs to deploy to Cloud Run
+resource "google_project_iam_member" "cloudbuild_run_admin" {
+  project = local.project_id
+  role    = "roles/run.admin"
+  member  = "serviceAccount:${data.google_project.project.number}@cloudbuild.gserviceaccount.com"
+}
+
+# Cloud Build needs to act as the Cloud Run service account
+resource "google_service_account_iam_member" "cloudbuild_act_as" {
+  service_account_id = google_service_account.ai_news.name
+  role               = "roles/iam.serviceAccountUser"
+  member             = "serviceAccount:${data.google_project.project.number}@cloudbuild.gserviceaccount.com"
+}
+
+# Cloud Build needs to access secrets for database migrations
+resource "google_secret_manager_secret_iam_member" "cloudbuild_database_url_access" {
+  secret_id = google_secret_manager_secret.database_url.secret_id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${data.google_project.project.number}@cloudbuild.gserviceaccount.com"
+}
+
+# Cloud Build needs VPC access for database migrations
+resource "google_project_iam_member" "cloudbuild_vpc_access" {
+  project = local.project_id
+  role    = "roles/vpcaccess.user"
+  member  = "serviceAccount:${data.google_project.project.number}@cloudbuild.gserviceaccount.com"
+}
