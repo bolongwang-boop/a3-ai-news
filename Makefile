@@ -11,7 +11,7 @@ DB_NAME      := ai_news
 DB_USER      := ainews
 DB_PORT      := 5432
 
-.PHONY: local test lint fmt news clean help db
+.PHONY: local test lint fmt news clean help db db-proxy
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
@@ -35,6 +35,13 @@ lint: $(VENV)/bin/activate ## Lint source code with ruff
 
 fmt: $(VENV)/bin/activate ## Format source code with ruff
 	$(BIN)/ruff format src/ tests/
+
+db-proxy: ## Start Cloud SQL Auth Proxy for GUI clients (Ctrl+C to stop)
+	@echo "Proxy listening on localhost:$(DB_PORT) — connect DBeaver/pgAdmin to:"
+	@echo "  Host: 127.0.0.1  Port: $(DB_PORT)  Database: $(DB_NAME)  User: $(DB_USER)"
+	@echo "  Password: gcloud secrets versions access latest --secret=a3-ai-news-database-url --project=$(PROJECT)"
+	@echo ""
+	cloud-sql-proxy $(DB_CONN_NAME) --port $(DB_PORT)
 
 db: ## Connect to Cloud SQL via Auth Proxy + psql
 	@cloud-sql-proxy $(DB_CONN_NAME) --port $(DB_PORT) & \

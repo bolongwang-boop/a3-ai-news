@@ -156,6 +156,8 @@ resource "google_cloud_run_v2_service" "ai_news" {
   # No unauthenticated access - auth-proxy uses OIDC to call this service
   ingress = "INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER"
 
+  deletion_protection = false
+
   depends_on = [
     google_project_service.apis["run.googleapis.com"],
     google_secret_manager_secret_iam_member.newsapi_key_access,

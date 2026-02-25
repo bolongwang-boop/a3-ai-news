@@ -18,6 +18,15 @@ resource "google_compute_subnetwork" "subnet" {
   ip_cidr_range = "10.0.0.0/24"
 }
 
+# VPC connectors require exactly /28
+resource "google_compute_subnetwork" "connector_subnet" {
+  name          = "${local.service_name}-connector-subnet"
+  project       = local.project_id
+  region        = local.region
+  network       = google_compute_network.vpc.id
+  ip_cidr_range = "10.0.1.0/28"
+}
+
 # Reserve IP range for private services (Cloud SQL)
 resource "google_compute_global_address" "private_ip_range" {
   name          = "${local.service_name}-private-ip"
@@ -32,6 +41,8 @@ resource "google_service_networking_connection" "private_vpc" {
   network                 = google_compute_network.vpc.id
   service                 = "servicenetworking.googleapis.com"
   reserved_peering_ranges = [google_compute_global_address.private_ip_range.name]
+
+  deletion_policy = "ABANDON"
 }
 
 # VPC access connector for Cloud Run -> Cloud SQL
@@ -41,7 +52,7 @@ resource "google_vpc_access_connector" "connector" {
   region  = local.region
 
   subnet {
-    name = google_compute_subnetwork.subnet.name
+    name = google_compute_subnetwork.connector_subnet.name
   }
 
   min_instances = 2
@@ -92,7 +103,7 @@ resource "google_sql_database_instance" "postgres" {
     }
   }
 
-  deletion_protection = true
+  deletion_protection = false
 
   depends_on = [
     google_project_service.apis["sqladmin.googleapis.com"],

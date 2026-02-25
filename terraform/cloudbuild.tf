@@ -8,30 +8,32 @@ data "google_project" "project" {
 }
 
 # Cloud Build trigger: deploy on every push to main
-resource "google_cloudbuild_trigger" "deploy" {
-  name     = "${local.service_name}-deploy"
-  project  = local.project_id
-  location = local.region
-
-  github {
-    owner = local.github_owner
-    name  = local.github_repo
-
-    push {
-      branch = "^main$"
-    }
-  }
-
-  filename = "cloudbuild.yaml"
-
-  substitutions = {
-    _REGION          = local.region
-    _SERVICE_NAME    = local.service_name
-    _SERVICE_ACCOUNT = google_service_account.ai_news.email
-  }
-
-  depends_on = [google_project_service.apis["cloudbuild.googleapis.com"]]
-}
+# NOTE: Requires a GitHub connection first. Create one at:
+#   https://console.cloud.google.com/cloud-build/repositories/2nd-gen?project=a3-team-481403
+# Then uncomment and set the repository field.
+#
+# resource "google_cloudbuild_trigger" "deploy" {
+#   name     = "${local.service_name}-deploy"
+#   project  = local.project_id
+#   location = local.region
+#
+#   repository_event_config {
+#     repository = "projects/${local.project_id}/locations/${local.region}/connections/CONNECTION_NAME/repositories/${local.github_repo}"
+#     push {
+#       branch = "^main$"
+#     }
+#   }
+#
+#   filename = "cloudbuild.yaml"
+#
+#   substitutions = {
+#     _REGION          = local.region
+#     _SERVICE_NAME    = local.service_name
+#     _SERVICE_ACCOUNT = google_service_account.ai_news.email
+#   }
+#
+#   depends_on = [google_project_service.apis["cloudbuild.googleapis.com"]]
+# }
 
 # ============================================================================
 # IAM - Grant Cloud Build service account permissions to deploy

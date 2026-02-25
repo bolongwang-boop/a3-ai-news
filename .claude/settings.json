@@ -1,0 +1,15 @@
+{
+  "extraKnownMarketplaces": {
+    "a3-claude-plugins": {
+      "source": {
+        "source": "git",
+        "url": "git@github.com:bolongwang-boop/a3-claude-plugins.git",
+        "ref": "main"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "python-dev-toolkit@a3-claude-plugins": true,
+    "ask-analytics@a3-claude-plugins": false
+  }
+}
