@@ -15,21 +15,27 @@ Aggregated AI news from authenticated/credible sources. All dates are calculated
 ## Quick Start
 
 ```bash
-# Install dependencies
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -e ".[dev]"
-
 # Set up environment
 cp .env.example .env
 # Edit .env with your AINEWS_NEWSAPI_KEY (optional — Google RSS works without it)
 
-# Run the API server
-uvicorn src.main:app --reload
-
-# Or fetch news from the CLI
-python -m src.cli
+# Run the API server locally (auto-creates venv and installs deps)
+make local
 ```
+
+### Make Targets
+
+| Command | Description |
+|---|---|
+| `make local` | Run the API server locally with hot-reload (port 8080) |
+| `make news` | Fetch latest AI news as JSON via CLI |
+| `make test` | Run the test suite |
+| `make lint` | Lint source code with ruff |
+| `make fmt` | Format source code with ruff |
+| `make clean` | Remove venv and caches |
+| `make help` | Show all available targets |
+
+All targets automatically create the virtualenv and install dependencies if needed.
 
 ## CLI Usage
 
@@ -92,7 +98,7 @@ All prefixed with `AINEWS_`:
 ## Testing
 
 ```bash
-pytest tests/ -v
+make test
 ```
 
 ## Project Structure
