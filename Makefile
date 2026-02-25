@@ -2,7 +2,16 @@ VENV := .venv
 BIN  := $(VENV)/bin
 PY   := $(BIN)/python
 
-.PHONY: local test lint fmt news clean help
+# Cloud SQL connection settings
+PROJECT      := a3-team-481403
+REGION       := australia-southeast1
+DB_INSTANCE  := a3-ai-news-db
+DB_CONN_NAME := $(PROJECT):$(REGION):$(DB_INSTANCE)
+DB_NAME      := ai_news
+DB_USER      := ainews
+DB_PORT      := 5432
+
+.PHONY: local test lint fmt news clean help db
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
@@ -26,6 +35,14 @@ lint: $(VENV)/bin/activate ## Lint source code with ruff
 
 fmt: $(VENV)/bin/activate ## Format source code with ruff
 	$(BIN)/ruff format src/ tests/
+
+db: ## Connect to Cloud SQL via Auth Proxy + psql
+	@cloud-sql-proxy $(DB_CONN_NAME) --port $(DB_PORT) & \
+	PROXY_PID=$$!; \
+	trap 'kill $$PROXY_PID 2>/dev/null' EXIT; \
+	sleep 2; \
+	psql "host=127.0.0.1 port=$(DB_PORT) dbname=$(DB_NAME) user=$(DB_USER)"; \
+	kill $$PROXY_PID 2>/dev/null
 
 clean: ## Remove venv and caches
 	rm -rf $(VENV) .pytest_cache .ruff_cache __pycache__ src/__pycache__

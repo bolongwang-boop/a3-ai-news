@@ -23,6 +23,11 @@ output "database_private_ip" {
   value       = google_sql_database_instance.postgres.private_ip_address
 }
 
+output "database_connection_name" {
+  description = "Connection name for Cloud SQL Auth Proxy (project:region:instance)"
+  value       = google_sql_database_instance.postgres.connection_name
+}
+
 output "database_url_secret_id" {
   description = "Secret Manager secret ID for the database URL"
   value       = google_secret_manager_secret.database_url.secret_id
