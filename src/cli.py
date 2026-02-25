@@ -30,13 +30,41 @@ async def _fetch_news(days: int, credible_only: bool, limit: int) -> dict:
             NewsAPISource(api_key=settings.newsapi_key, http_client=http_client),
             GoogleRSSSource(http_client=http_client),
         ]
-        aggregator = NewsAggregator(
-            sources=sources, settings=settings, repository=None
-        )
-        response = await aggregator.fetch_weekly_ai_news(
-            days_back=days, credible_only=credible_only, limit=limit
-        )
-    return response.model_dump(mode="json")
+
+        repository = None
+        engine = None
+
+        if settings.database_url and settings.enable_persistence:
+            try:
+                from src.database.connection import get_engine, get_session_factory
+                from src.database.models import Base
+                from src.database.repository import ArticleRepository
+
+                engine = get_engine(
+                    settings.database_url,
+                    pool_size=settings.database_pool_size,
+                    max_overflow=settings.database_max_overflow,
+                )
+                async with engine.begin() as conn:
+                    await conn.run_sync(Base.metadata.create_all)
+                session_factory = get_session_factory(engine)
+                repository = ArticleRepository(session_factory)
+                logger.info("CLI: database persistence enabled")
+            except Exception:
+                logger.exception("CLI: failed to initialize database — running without persistence")
+                repository = None
+
+        try:
+            aggregator = NewsAggregator(
+                sources=sources, settings=settings, repository=repository
+            )
+            response = await aggregator.fetch_weekly_ai_news(
+                days_back=days, credible_only=credible_only, limit=limit
+            )
+            return response.model_dump(mode="json")
+        finally:
+            if engine is not None:
+                await engine.dispose()
 
 
 def main() -> None:

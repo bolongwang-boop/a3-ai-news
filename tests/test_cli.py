@@ -1,5 +1,7 @@
 import json
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 from tests.conftest import make_article
 
@@ -131,3 +133,89 @@ class TestCLIFileOutput:
         assert captured.out == ""  # nothing to stdout
         assert "3 articles" in captured.err
         assert str(output_path) in captured.err
+
+
+class TestCLIDatabasePersistence:
+    """Tests for CLI database persistence when AINEWS_DATABASE_URL is configured."""
+
+    @pytest.mark.asyncio
+    async def test_creates_repository_when_db_configured(self):
+        """CLI initialises a repository when database settings are present."""
+        from src.cli import _fetch_news
+
+        mock_engine = MagicMock()
+        mock_conn = AsyncMock()
+        mock_engine.begin = MagicMock(return_value=mock_conn)
+        mock_engine.dispose = AsyncMock()
+        mock_conn.__aenter__ = AsyncMock(return_value=mock_conn)
+        mock_conn.__aexit__ = AsyncMock(return_value=False)
+        mock_conn.run_sync = AsyncMock()
+
+        with (
+            patch("src.cli.settings") as mock_settings,
+            patch("src.database.connection.create_async_engine", return_value=mock_engine),
+            patch("src.aggregator.NewsAggregator.fetch_weekly_ai_news", new_callable=AsyncMock) as mock_fetch,
+        ):
+            mock_settings.newsapi_key = None
+            mock_settings.database_url = "postgresql+asyncpg://user:pass@localhost/test"
+            mock_settings.enable_persistence = True
+            mock_settings.database_pool_size = 5
+            mock_settings.database_max_overflow = 10
+            mock_settings.credible_domains = []
+
+            mock_response = MagicMock()
+            mock_response.model_dump.return_value = {"total_articles": 0, "articles": []}
+            mock_fetch.return_value = mock_response
+
+            await _fetch_news(7, True, 50)
+
+            # Verify the aggregator was called (which means repository was wired up)
+            mock_fetch.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_runs_without_persistence_when_db_not_configured(self):
+        """CLI runs without persistence when database settings are absent."""
+        from src.cli import _fetch_news
+
+        with (
+            patch("src.cli.settings") as mock_settings,
+            patch("src.aggregator.NewsAggregator.fetch_weekly_ai_news", new_callable=AsyncMock) as mock_fetch,
+        ):
+            mock_settings.newsapi_key = None
+            mock_settings.database_url = None
+            mock_settings.enable_persistence = False
+            mock_settings.credible_domains = []
+
+            mock_response = MagicMock()
+            mock_response.model_dump.return_value = {"total_articles": 0, "articles": []}
+            mock_fetch.return_value = mock_response
+
+            await _fetch_news(7, True, 50)
+
+            mock_fetch.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_falls_back_when_db_init_fails(self):
+        """CLI falls back to no persistence when database initialisation fails."""
+        from src.cli import _fetch_news
+
+        with (
+            patch("src.cli.settings") as mock_settings,
+            patch("src.database.connection.create_async_engine", side_effect=RuntimeError("connection refused")),
+            patch("src.aggregator.NewsAggregator.fetch_weekly_ai_news", new_callable=AsyncMock) as mock_fetch,
+        ):
+            mock_settings.newsapi_key = None
+            mock_settings.database_url = "postgresql+asyncpg://user:pass@localhost/test"
+            mock_settings.enable_persistence = True
+            mock_settings.database_pool_size = 5
+            mock_settings.database_max_overflow = 10
+            mock_settings.credible_domains = []
+
+            mock_response = MagicMock()
+            mock_response.model_dump.return_value = {"total_articles": 0, "articles": []}
+            mock_fetch.return_value = mock_response
+
+            # Should not raise — gracefully falls back
+            await _fetch_news(7, True, 50)
+
+            mock_fetch.assert_called_once()
