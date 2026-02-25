@@ -8,6 +8,9 @@ class Settings(BaseSettings):
     default_days_back: int = 7
     cache_ttl_minutes: int = 30
 
+    # CLI output
+    output_file: str | None = None
+
     # Database
     database_url: str | None = None
     enable_persistence: bool = False
