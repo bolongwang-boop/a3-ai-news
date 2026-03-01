@@ -16,27 +16,37 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.create_table(
-        "articles",
-        sa.Column("id", sa.Integer(), autoincrement=True, nullable=False),
-        sa.Column("title", sa.String(length=1024), nullable=False),
-        sa.Column("description", sa.Text(), nullable=True),
-        sa.Column("url", sa.String(length=2048), nullable=False),
-        sa.Column("published_at", sa.DateTime(timezone=True), nullable=False),
-        sa.Column("published_at_sydney", sa.String(length=64), nullable=False),
-        sa.Column("source_name", sa.String(length=256), nullable=False),
-        sa.Column("source_url", sa.String(length=2048), nullable=True),
-        sa.Column("source_is_credible", sa.Boolean(), nullable=False, server_default="false"),
-        sa.Column("image_url", sa.String(length=2048), nullable=True),
-        sa.Column("fetched_from", sa.String(length=64), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.PrimaryKeyConstraint("id"),
-    )
+    # Idempotent: the table may already exist from Base.metadata.create_all
+    # which ran before Alembic was introduced.
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
 
-    op.create_index("ix_articles_published_at", "articles", ["published_at"])
-    op.create_index("ix_articles_source_credible", "articles", ["source_is_credible"])
-    op.create_index("ix_articles_url", "articles", ["url"], unique=True)
+    if "articles" not in inspector.get_table_names():
+        op.create_table(
+            "articles",
+            sa.Column("id", sa.Integer(), autoincrement=True, nullable=False),
+            sa.Column("title", sa.String(length=1024), nullable=False),
+            sa.Column("description", sa.Text(), nullable=True),
+            sa.Column("url", sa.String(length=2048), nullable=False),
+            sa.Column("published_at", sa.DateTime(timezone=True), nullable=False),
+            sa.Column("published_at_sydney", sa.String(length=64), nullable=False),
+            sa.Column("source_name", sa.String(length=256), nullable=False),
+            sa.Column("source_url", sa.String(length=2048), nullable=True),
+            sa.Column("source_is_credible", sa.Boolean(), nullable=False, server_default="false"),
+            sa.Column("image_url", sa.String(length=2048), nullable=True),
+            sa.Column("fetched_from", sa.String(length=64), nullable=False),
+            sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+            sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+            sa.PrimaryKeyConstraint("id"),
+        )
+
+    existing_indexes = {idx["name"] for idx in inspector.get_indexes("articles")}
+    if "ix_articles_published_at" not in existing_indexes:
+        op.create_index("ix_articles_published_at", "articles", ["published_at"])
+    if "ix_articles_source_credible" not in existing_indexes:
+        op.create_index("ix_articles_source_credible", "articles", ["source_is_credible"])
+    if "ix_articles_url" not in existing_indexes:
+        op.create_index("ix_articles_url", "articles", ["url"], unique=True)
 
 
 def downgrade() -> None:
