@@ -32,23 +32,31 @@ steps:
       - 'push'
       - 'gcr.io/$PROJECT_ID/${_SERVICE_NAME}'
 
-  # Step 3: Run database migrations via Cloud SQL Auth Proxy
+  # Step 3: Download Cloud SQL Auth Proxy (the app image lacks curl)
+  - name: 'gcr.io/cloud-builders/curl'
+    id: 'download-proxy'
+    waitFor: ['-']
+    args:
+      - '-fsSL'
+      - 'https://storage.googleapis.com/cloud-sql-connectors/cloud-sql-proxy/v2.15.2/cloud-sql-proxy.linux.amd64'
+      - '-o'
+      - '/workspace/cloud-sql-proxy'
+
+  # Step 4: Run database migrations via Cloud SQL Auth Proxy
   # Cloud Build cannot reach the Cloud SQL private IP directly.
   # We start the proxy in the background, rewrite the DB URL to use
   # localhost:5432, then run Alembic migrations.
   - name: 'gcr.io/$PROJECT_ID/${_SERVICE_NAME}'
     id: 'migrate'
-    waitFor: ['push']
+    waitFor: ['push', 'download-proxy']
     entrypoint: 'bash'
     args:
       - '-c'
       - |
-        # Install the Cloud SQL Auth Proxy
-        curl -fsSL https://storage.googleapis.com/cloud-sql-connectors/cloud-sql-proxy/v2.15.2/cloud-sql-proxy.linux.amd64 \
-          -o /usr/local/bin/cloud-sql-proxy && chmod +x /usr/local/bin/cloud-sql-proxy
+        chmod +x /workspace/cloud-sql-proxy
 
         # Start proxy in the background
-        /usr/local/bin/cloud-sql-proxy ${_CLOUD_SQL_CONNECTION} --port 5432 &
+        /workspace/cloud-sql-proxy ${_CLOUD_SQL_CONNECTION} --port 5432 &
         PROXY_PID=$$!
 
         # Wait for proxy to be ready (up to 10s)
@@ -68,7 +76,7 @@ steps:
         exit $$EXIT_CODE
     secretEnv: ['AINEWS_DATABASE_URL']
 
-  # Step 4: Deploy to Cloud Run
+  # Step 5: Deploy to Cloud Run
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     id: 'deploy'
     waitFor: ['migrate']
