@@ -1,7 +1,7 @@
 import logging
 from datetime import datetime
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -91,17 +91,6 @@ class ArticleRepository:
 
             articles = [self._row_to_article(row) for row in rows]
             return total, articles
-
-    async def cleanup_old_articles(self, before_date: datetime) -> int:
-        """Delete articles older than the given date. Returns count of deleted rows."""
-        async with self._session_factory() as session:
-            stmt = delete(ArticleRow).where(ArticleRow.published_at < before_date)
-            result = await session.execute(stmt)
-            await session.commit()
-
-            count = result.rowcount  # type: ignore[union-attr]
-            logger.info("Cleaned up %d old articles (before %s)", count, before_date)
-            return count
 
     async def get_stats(self) -> dict:
         """Return article count statistics."""

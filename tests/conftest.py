@@ -3,7 +3,6 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
-from src.config import Settings
 from src.models import Article, ArticleSource
 
 UTC = ZoneInfo("UTC")
@@ -63,6 +62,3 @@ def sample_articles():
     ]
 
 
-@pytest.fixture
-def default_settings():
-    return Settings(newsapi_key=None)

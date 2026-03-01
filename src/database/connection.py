@@ -1,8 +1,4 @@
-import logging
-
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
-
-logger = logging.getLogger(__name__)
 
 
 def get_engine(database_url: str, pool_size: int = 5, max_overflow: int = 10) -> AsyncEngine:
