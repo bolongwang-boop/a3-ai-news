@@ -193,7 +193,7 @@ class TestFetchWeeklyAINews:
         assert result.articles[1].title == "Old"
 
     @pytest.mark.asyncio
-    async def test_pagination(self, settings):
+    async def test_limit_caps_results(self, settings):
         now = datetime.now(UTC)
         articles = [
             make_article(title=f"Art {i}", url=f"https://bbc.com/{i}", source_name="BBC News", published_at=now - timedelta(hours=i))
@@ -205,7 +205,25 @@ class TestFetchWeeklyAINews:
 
         with patch("src.aggregator.get_week_range_sydney") as mock_range:
             mock_range.return_value = (now - timedelta(days=7), now)
-            result = await agg.fetch_weekly_ai_news(credible_only=False, limit=2, offset=1)
+            result = await agg.fetch_weekly_ai_news(credible_only=False, limit=2)
+
+        assert result.total_articles == 2
+        assert len(result.articles) == 2
+
+    @pytest.mark.asyncio
+    async def test_no_limit_returns_all(self, settings):
+        now = datetime.now(UTC)
+        articles = [
+            make_article(title=f"Art {i}", url=f"https://bbc.com/{i}", source_name="BBC News", published_at=now - timedelta(hours=i))
+            for i in range(5)
+        ]
+
+        sources = [FakeSource("test", articles)]
+        agg = NewsAggregator(sources=sources, settings=settings)
+
+        with patch("src.aggregator.get_week_range_sydney") as mock_range:
+            mock_range.return_value = (now - timedelta(days=7), now)
+            result = await agg.fetch_weekly_ai_news(credible_only=False)
 
         assert result.total_articles == 5
-        assert len(result.articles) == 2
+        assert len(result.articles) == 5

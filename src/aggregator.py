@@ -101,8 +101,7 @@ class NewsAggregator:
         self,
         days_back: int = 7,
         credible_only: bool = True,
-        limit: int = 50,
-        offset: int = 0,
+        limit: int | None = None,
         max_results: int = 100,
     ) -> NewsResponse:
         from_utc, to_utc = get_week_range_sydney(days_back)
@@ -143,8 +142,9 @@ class NewsAggregator:
         # Sort newest first
         articles.sort(key=lambda a: a.published_at, reverse=True)
 
-        # Pagination
-        paginated = articles[offset : offset + limit]
+        # Apply limit
+        if limit is not None:
+            articles = articles[:limit]
 
         return NewsResponse(
             total_articles=len(articles),
@@ -152,15 +152,14 @@ class NewsAggregator:
             from_date_sydney=utc_to_sydney_str(from_utc),
             to_date_sydney=utc_to_sydney_str(to_utc),
             sources_queried=sources_queried,
-            articles=paginated,
+            articles=articles,
         )
 
     async def fetch_from_database(
         self,
         days_back: int = 7,
         credible_only: bool = True,
-        limit: int = 50,
-        offset: int = 0,
+        limit: int | None = None,
     ) -> NewsResponse:
         """Fetch articles from the database (cached/persisted data)."""
         if self._repository is None:
@@ -172,8 +171,7 @@ class NewsAggregator:
             from_date=from_utc,
             to_date=to_utc,
             credible_only=credible_only,
-            limit=limit,
-            offset=offset,
+            limit=limit or 500,
         )
 
         return NewsResponse(
