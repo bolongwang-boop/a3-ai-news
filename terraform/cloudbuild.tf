@@ -39,30 +39,36 @@ data "google_project" "project" {
 # IAM - Grant Cloud Build service account permissions to deploy
 # ============================================================================
 
+# 2nd-gen Cloud Build triggers use the App Engine default service account
+# (<project-id>@appspot.gserviceaccount.com), not the legacy Cloud Build SA.
+locals {
+  cloudbuild_sa = "serviceAccount:${local.project_id}@appspot.gserviceaccount.com"
+}
+
 # Cloud Build needs to deploy to Cloud Run
 resource "google_project_iam_member" "cloudbuild_run_admin" {
   project = local.project_id
   role    = "roles/run.admin"
-  member  = "serviceAccount:${data.google_project.project.number}@cloudbuild.gserviceaccount.com"
+  member  = local.cloudbuild_sa
 }
 
 # Cloud Build needs to act as the Cloud Run service account
 resource "google_service_account_iam_member" "cloudbuild_act_as" {
   service_account_id = google_service_account.ai_news.name
   role               = "roles/iam.serviceAccountUser"
-  member             = "serviceAccount:${data.google_project.project.number}@cloudbuild.gserviceaccount.com"
+  member             = local.cloudbuild_sa
 }
 
 # Cloud Build needs to access secrets for database migrations
 resource "google_secret_manager_secret_iam_member" "cloudbuild_database_url_access" {
   secret_id = google_secret_manager_secret.database_url.secret_id
   role      = "roles/secretmanager.secretAccessor"
-  member    = "serviceAccount:${data.google_project.project.number}@cloudbuild.gserviceaccount.com"
+  member    = local.cloudbuild_sa
 }
 
 # Cloud Build needs VPC access for database migrations
 resource "google_project_iam_member" "cloudbuild_vpc_access" {
   project = local.project_id
   role    = "roles/vpcaccess.user"
-  member  = "serviceAccount:${data.google_project.project.number}@cloudbuild.gserviceaccount.com"
+  member  = local.cloudbuild_sa
 }
