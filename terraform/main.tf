@@ -55,6 +55,12 @@ resource "google_service_account" "ai_news" {
 # SECRET MANAGER
 # ============================================================================
 
+variable "newsapi_key" {
+  description = "NewsAPI.org API key"
+  type        = string
+  sensitive   = true
+}
+
 resource "google_secret_manager_secret" "newsapi_key" {
   secret_id = "${local.service_name}-newsapi-key"
   project   = local.project_id
@@ -64,6 +70,11 @@ resource "google_secret_manager_secret" "newsapi_key" {
   }
 
   depends_on = [google_project_service.apis["secretmanager.googleapis.com"]]
+}
+
+resource "google_secret_manager_secret_version" "newsapi_key" {
+  secret      = google_secret_manager_secret.newsapi_key.id
+  secret_data = var.newsapi_key
 }
 
 resource "google_secret_manager_secret" "database_url" {
@@ -174,5 +185,5 @@ resource "google_cloud_run_v2_service_iam_member" "auth_proxy_invoker" {
   location = local.region
   name     = google_cloud_run_v2_service.ai_news.name
   role     = "roles/run.invoker"
-  member   = "serviceAccount:a3-auth-api-auth-proxy@${local.project_id}.iam.gserviceaccount.com"
+  member   = "serviceAccount:a3-auth-proxy@${local.project_id}.iam.gserviceaccount.com"
 }
