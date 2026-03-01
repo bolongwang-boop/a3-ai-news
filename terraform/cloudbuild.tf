@@ -72,3 +72,10 @@ resource "google_project_iam_member" "cloudbuild_vpc_access" {
   role    = "roles/vpcaccess.user"
   member  = local.cloudbuild_sa
 }
+
+# Cloud Build needs Cloud SQL client role for the Auth Proxy during migrations
+resource "google_project_iam_member" "cloudbuild_sql_client" {
+  project = local.project_id
+  role    = "roles/cloudsql.client"
+  member  = local.cloudbuild_sa
+}

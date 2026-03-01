@@ -12,6 +12,7 @@ substitutions:
   _REGION: australia-southeast1
   _SERVICE_NAME: a3-ai-news
   _SERVICE_ACCOUNT: ''  # Set from terraform output
+  _CLOUD_SQL_CONNECTION: a3-team-481403:australia-southeast1:a3-ai-news-db
 
 steps:
   # Step 1: Build the container image
@@ -31,16 +32,40 @@ steps:
       - 'push'
       - 'gcr.io/$PROJECT_ID/${_SERVICE_NAME}'
 
-  # Step 3: Run database migrations
+  # Step 3: Run database migrations via Cloud SQL Auth Proxy
+  # Cloud Build cannot reach the Cloud SQL private IP directly.
+  # We start the proxy in the background, rewrite the DB URL to use
+  # localhost:5432, then run Alembic migrations.
   - name: 'gcr.io/$PROJECT_ID/${_SERVICE_NAME}'
     id: 'migrate'
     waitFor: ['push']
-    entrypoint: 'python'
+    entrypoint: 'bash'
     args:
-      - '-m'
-      - 'alembic'
-      - 'upgrade'
-      - 'head'
+      - '-c'
+      - |
+        # Install the Cloud SQL Auth Proxy
+        curl -fsSL https://storage.googleapis.com/cloud-sql-connectors/cloud-sql-proxy/v2.15.2/cloud-sql-proxy.linux.amd64 \
+          -o /usr/local/bin/cloud-sql-proxy && chmod +x /usr/local/bin/cloud-sql-proxy
+
+        # Start proxy in the background
+        /usr/local/bin/cloud-sql-proxy ${_CLOUD_SQL_CONNECTION} --port 5432 &
+        PROXY_PID=$$!
+
+        # Wait for proxy to be ready (up to 10s)
+        for i in 1 2 3 4 5 6 7 8 9 10; do
+          python -c "import socket; s=socket.create_connection(('127.0.0.1',5432),1); s.close()" 2>/dev/null && break
+          sleep 1
+        done
+
+        # Rewrite the DB URL to connect via the local proxy instead of private IP
+        # postgresql+asyncpg://user:pass@<private-ip>/db -> ...@127.0.0.1/db
+        export AINEWS_DATABASE_URL=$(echo "$$AINEWS_DATABASE_URL" | sed -E 's|@[^/]+/|@127.0.0.1/|')
+
+        python -m alembic upgrade head
+        EXIT_CODE=$$?
+
+        kill $$PROXY_PID 2>/dev/null || true
+        exit $$EXIT_CODE
     secretEnv: ['AINEWS_DATABASE_URL']
 
   # Step 4: Deploy to Cloud Run

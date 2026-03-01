@@ -103,12 +103,11 @@ class NewsAggregator:
         credible_only: bool = True,
         limit: int = 50,
         offset: int = 0,
-        length: int = 100,
     ) -> NewsResponse:
         from_utc, to_utc = get_week_range_sydney(days_back)
 
         active = self.available_sources
-        tasks = [s.fetch_ai_news(from_utc, to_utc, max_results=length) for s in active]
+        tasks = [s.fetch_ai_news(from_utc, to_utc, max_results=100) for s in active]
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
         all_articles: list[Article] = []
