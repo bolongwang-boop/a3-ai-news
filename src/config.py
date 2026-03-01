@@ -42,6 +42,13 @@ class Settings(BaseSettings):
         "cnet.com",
         "engadget.com",
         "tomsguide.com",
+        "cio.com",
+        "eweek.com",
+        "infoworld.com",
+        "computerworld.com",
+        "csoonline.com",
+        "networkworld.com",
+        "towardsdatascience.com",
         # Science / academic
         "nature.com",
         "science.org",
@@ -54,12 +61,19 @@ class Settings(BaseSettings):
         "cnbc.com",
         "businessinsider.com",
         "forbes.com",
-        # AI companies (official announcements)
+        "fortune.com",
+        "hbr.org",
+        "vox.com",
+        "observer.com",
+        # AI companies / cloud providers
         "openai.com",
         "deepmind.google",
         "anthropic.com",
         "arxiv.org",
         "huggingface.co",
+        "aws.amazon.com",
+        "cloud.google.com",
+        "azure.microsoft.com",
     ]
 
     model_config = {"env_file": ".env", "env_prefix": "AINEWS_"}

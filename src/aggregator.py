@@ -41,15 +41,45 @@ _DOMAIN_TO_NAME = {
     "cnbc.com": "CNBC",
     "businessinsider.com": "Business Insider",
     "forbes.com": "Forbes",
+    "fortune.com": "Fortune",
+    "hbr.org": "Harvard Business Review",
+    "vox.com": "Vox",
+    "observer.com": "Observer",
+    "cio.com": "CIO",
+    "eweek.com": "eWeek",
+    "infoworld.com": "InfoWorld",
+    "computerworld.com": "Computerworld",
+    "csoonline.com": "CSO Online",
+    "networkworld.com": "Network World",
+    "towardsdatascience.com": "Towards Data Science",
     "openai.com": "OpenAI",
     "deepmind.google": "Google DeepMind",
     "anthropic.com": "Anthropic",
     "arxiv.org": "arXiv",
     "huggingface.co": "Hugging Face",
+    "aws.amazon.com": "Amazon Web Services",
+    "cloud.google.com": "Google Cloud",
+    "azure.microsoft.com": "Microsoft Azure",
+}
+
+# Aliases: Google RSS source names that don't match _DOMAIN_TO_NAME values.
+# Maps lowered RSS source name -> canonical credible name.
+_NAME_ALIASES = {
+    "australian broadcasting corporation": "ABC News",
+    "abc news (australia)": "ABC News",
+    "bbc": "BBC News",
+    "bbc news": "BBC News",
+    "wired": "WIRED",
+    "zdnet": "ZDNET",
+    "amazon web services (aws)": "Amazon Web Services",
+    "amazon web services": "Amazon Web Services",
+    "towards data science": "Towards Data Science",
+    "harvard business review": "Harvard Business Review",
 }
 
 # Build a reverse lookup: lowered source name -> credible
 _CREDIBLE_NAMES = {name.lower() for name in _DOMAIN_TO_NAME.values()}
+_CREDIBLE_NAMES.update(alias.lower() for alias in _NAME_ALIASES.keys())
 
 
 class NewsAggregator:
@@ -73,11 +103,12 @@ class NewsAggregator:
         credible_only: bool = True,
         limit: int = 50,
         offset: int = 0,
+        length: int = 100,
     ) -> NewsResponse:
         from_utc, to_utc = get_week_range_sydney(days_back)
 
         active = self.available_sources
-        tasks = [s.fetch_ai_news(from_utc, to_utc, max_results=100) for s in active]
+        tasks = [s.fetch_ai_news(from_utc, to_utc, max_results=length) for s in active]
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
         all_articles: list[Article] = []
@@ -175,12 +206,15 @@ class NewsAggregator:
     def _mark_credibility(self, articles: list[Article]) -> list[Article]:
         for article in articles:
             domain = self._extract_domain(article.source.url or article.url)
+            name_lower = article.source.name.lower()
             # Check by domain first, then fall back to name-based matching
             # (Google RSS wraps URLs through news.google.com, so domain check
             # won't work — but the source name is reliably extracted from the title)
             by_domain = domain in self._credible_domains
-            by_name = article.source.name.lower() in _CREDIBLE_NAMES
-            article.source.is_credible = by_domain or by_name
+            by_name = name_lower in _CREDIBLE_NAMES
+            # Google RSS sometimes uses the domain as the source name (e.g. "cio.com")
+            by_name_as_domain = name_lower in self._credible_domains
+            article.source.is_credible = by_domain or by_name or by_name_as_domain
             article.source.url = article.source.url or article.url
         return articles
 

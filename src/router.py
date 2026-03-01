@@ -20,6 +20,7 @@ async def get_ai_news(
     credible_only: bool = Query(default=True, description="Only return articles from credible/authenticated sources"),
     limit: int = Query(default=50, ge=1, le=200, description="Maximum articles to return"),
     offset: int = Query(default=0, ge=0, description="Pagination offset"),
+    length: int = Query(default=100, ge=1, le=500, description="Maximum articles to collect from each news source"),
     source: NewsSource = Query(default=NewsSource.live, description="'live' fetches from news APIs; 'cached' reads from database"),
 ) -> NewsResponse:
     """Retrieve AI news published in the last N days (Australia/Sydney timezone).
@@ -47,6 +48,7 @@ async def get_ai_news(
         credible_only=credible_only,
         limit=limit,
         offset=offset,
+        length=length,
     )
 
 
@@ -56,6 +58,7 @@ async def get_ai_news_slack(
     days: int = Query(default=7, ge=1, le=30, description="Days to look back from now (Sydney time)"),
     credible_only: bool = Query(default=True, description="Only return articles from credible/authenticated sources"),
     limit: int = Query(default=10, ge=1, le=50, description="Maximum articles in the Slack message"),
+    length: int = Query(default=100, ge=1, le=500, description="Maximum articles to collect from each news source"),
     source: NewsSource = Query(default=NewsSource.live, description="'live' fetches from news APIs; 'cached' reads from database"),
 ) -> dict:
     """Return AI news formatted as Slack Block Kit JSON.
@@ -81,6 +84,7 @@ async def get_ai_news_slack(
             credible_only=credible_only,
             limit=limit,
             offset=0,
+            length=length,
         )
 
     return format_articles_for_slack(
