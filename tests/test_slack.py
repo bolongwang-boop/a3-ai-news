@@ -28,18 +28,11 @@ class TestFormatArticleBlock:
         assert sample_article.url in text
         assert sample_article.title in text
 
-    def test_credible_badge_shown(self):
-        article = make_article(is_credible=True)
-        article.source.is_credible = True
+    def test_source_name_shown(self):
+        article = make_article(source_name="BBC News")
         blocks = format_article_block(article)
         text = blocks[1]["text"]["text"]
-        assert ":white_check_mark:" in text
-
-    def test_no_badge_for_not_credible(self):
-        article = make_article(is_credible=False)
-        blocks = format_article_block(article)
-        text = blocks[1]["text"]["text"]
-        assert ":white_check_mark:" not in text
+        assert "_BBC News_" in text
 
     def test_image_accessory_when_present(self):
         article = make_article(image_url="https://example.com/img.jpg")

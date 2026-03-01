@@ -22,11 +22,9 @@ def format_article_block(article: Article) -> list[dict]:
 
     # Main section: title (linked) + metadata
     title_link = f"<{article.url}|{article.title}>"
-    credible_badge = " :white_check_mark:" if article.source.is_credible else ""
-
     text = (
         f"*{title_link}*\n"
-        f"_{article.source.name}_{credible_badge}  |  {article.published_at_sydney}"
+        f"_{article.source.name}_  |  {article.published_at_sydney}"
     )
 
     section: dict = {

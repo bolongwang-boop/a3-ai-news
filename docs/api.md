@@ -127,7 +127,7 @@ GET /api/v1/news/slack?days=7&limit=5
       "type": "section",
       "text": {
         "type": "mrkdwn",
-        "text": "*<https://openai.com/blog/gpt-5|OpenAI releases GPT-5>*\n_OpenAI_ :white_check_mark:  |  2026-03-01 21:00:00 AEDT"
+        "text": "*<https://openai.com/blog/gpt-5|OpenAI releases GPT-5>*\n_OpenAI_  |  2026-03-01 21:00:00 AEDT"
       }
     }
   ]
