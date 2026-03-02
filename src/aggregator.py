@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import re
 from urllib.parse import urlparse
 
 from src.config import Settings
@@ -8,6 +9,25 @@ from src.sources.base import NewsSource
 from src.timezone import get_week_range_sydney, is_within_sydney_range, utc_to_sydney_str
 
 logger = logging.getLogger(__name__)
+
+# Post-fetch relevance filter: at least one AI keyword must appear in title or description.
+_AI_RELEVANCE_RE = re.compile(
+    r"\b("
+    r"artificial intelligence|machine learning|deep learning"
+    r"|large language model|generative AI|neural network"
+    r"|transformer model|computer vision|natural language processing"
+    r"|LLM|GPT|ChatGPT|OpenAI|DeepMind|Anthropic|Claude AI"
+    r"|Gemini|Copilot|Midjourney|Stable Diffusion|Hugging Face"
+    r"|AI agent|AI model|AI safety|AI regulation|AI"
+    r")\b",
+    re.IGNORECASE,
+)
+
+
+def _is_ai_relevant(article: Article) -> bool:
+    """Check if an article's title or description mentions AI-related keywords."""
+    text = f"{article.title} {article.description or ''}"
+    return _AI_RELEVANCE_RE.search(text) is not None
 
 
 _DOMAIN_TO_NAME = {
@@ -127,6 +147,7 @@ class NewsAggregator:
         ]
 
         articles = self._deduplicate(articles)
+        articles = [a for a in articles if _is_ai_relevant(a)]
         articles = self._mark_credibility(articles)
 
         # Persist to database if available

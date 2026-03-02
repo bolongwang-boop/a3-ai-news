@@ -14,8 +14,9 @@ from src.timezone import UTC_TZ, is_within_sydney_range, utc_to_sydney_str
 logger = logging.getLogger(__name__)
 
 AI_QUERY = (
-    "artificial intelligence OR AI OR machine learning OR deep learning "
-    "OR LLM OR generative AI OR GPT OR neural network OR transformer OR ChatGPT"
+    '"artificial intelligence" OR "machine learning" OR "deep learning" '
+    'OR "large language model" OR "LLM" OR "generative AI" OR "GPT" '
+    'OR "neural network" OR "ChatGPT" OR "Claude AI"'
 )
 
 _HTML_TAG_RE = re.compile(r"<[^>]+>")
