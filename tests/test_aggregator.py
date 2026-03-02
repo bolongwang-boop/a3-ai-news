@@ -77,12 +77,21 @@ class TestDeduplication:
 
     def test_keeps_unique_urls(self, settings):
         articles = [
-            make_article(url="https://bbc.com/article-1"),
-            make_article(url="https://bbc.com/article-2"),
+            make_article(title="AI breakthrough one", url="https://bbc.com/article-1"),
+            make_article(title="AI breakthrough two", url="https://bbc.com/article-2"),
         ]
         agg = NewsAggregator(sources=[], settings=settings)
         result = agg._deduplicate(articles)
         assert len(result) == 2
+
+    def test_removes_duplicate_titles(self, settings):
+        articles = [
+            make_article(title="OpenAI releases GPT-5", url="https://openai.com/gpt-5"),
+            make_article(title="OpenAI releases GPT-5", url="https://techcrunch.com/openai-gpt-5"),
+        ]
+        agg = NewsAggregator(sources=[], settings=settings)
+        result = agg._deduplicate(articles)
+        assert len(result) == 1
 
 
 class TestCredibilityMarking:
@@ -122,8 +131,8 @@ class TestFetchWeeklyAINews:
     @pytest.mark.asyncio
     async def test_aggregates_from_multiple_sources(self, settings):
         now = datetime.now(UTC)
-        a1 = make_article(title="From API", url="https://openai.com/1", published_at=now - timedelta(hours=1))
-        a2 = make_article(title="From RSS", url="https://bbc.com/2", source_name="BBC News", published_at=now - timedelta(hours=2))
+        a1 = make_article(title="OpenAI launches new AI model", url="https://openai.com/new-ai-model", published_at=now - timedelta(hours=1))
+        a2 = make_article(title="DeepMind AI breakthrough in science", url="https://bbc.com/deepmind-ai-breakthrough-science", source_name="BBC News", published_at=now - timedelta(hours=2))
 
         sources = [
             FakeSource("newsapi", [a1]),
@@ -141,8 +150,8 @@ class TestFetchWeeklyAINews:
     @pytest.mark.asyncio
     async def test_filters_credible_only(self, settings):
         now = datetime.now(UTC)
-        credible = make_article(title="BBC", url="https://bbc.com/ai", source_name="BBC News", published_at=now - timedelta(hours=1))
-        not_credible = make_article(title="Blog", url="https://randomblog.xyz/ai", source_name="Random", published_at=now - timedelta(hours=1))
+        credible = make_article(title="BBC covers new AI regulation", url="https://bbc.com/new-ai-regulation", source_name="BBC News", published_at=now - timedelta(hours=1))
+        not_credible = make_article(title="AI blog post review", url="https://randomblog.xyz/ai-blog-post-review", source_name="Random", published_at=now - timedelta(hours=1))
 
         sources = [FakeSource("test", [credible, not_credible])]
         agg = NewsAggregator(sources=sources, settings=settings)
@@ -152,7 +161,7 @@ class TestFetchWeeklyAINews:
             result = await agg.fetch_weekly_ai_news(credible_only=True)
 
         assert result.total_articles == 1
-        assert result.articles[0].title == "BBC"
+        assert result.articles[0].title == "BBC covers new AI regulation"
 
     @pytest.mark.asyncio
     async def test_handles_source_failure_gracefully(self, settings):
@@ -195,9 +204,16 @@ class TestFetchWeeklyAINews:
     @pytest.mark.asyncio
     async def test_limit_caps_results(self, settings):
         now = datetime.now(UTC)
+        titles_urls = [
+            ("OpenAI releases new AI model", "https://bbc.com/openai-releases-new-ai-model"),
+            ("DeepMind AI safety research update", "https://bbc.com/deepmind-ai-safety-research-update"),
+            ("Google Gemini AI launch details", "https://bbc.com/google-gemini-ai-launch-details"),
+            ("Anthropic Claude AI breakthrough", "https://bbc.com/anthropic-claude-ai-breakthrough"),
+            ("Microsoft Copilot AI expansion", "https://bbc.com/microsoft-copilot-ai-expansion"),
+        ]
         articles = [
-            make_article(title=f"Art {i}", url=f"https://bbc.com/{i}", source_name="BBC News", published_at=now - timedelta(hours=i))
-            for i in range(5)
+            make_article(title=t, url=u, source_name="BBC News", published_at=now - timedelta(hours=i))
+            for i, (t, u) in enumerate(titles_urls)
         ]
 
         sources = [FakeSource("test", articles)]
@@ -213,9 +229,16 @@ class TestFetchWeeklyAINews:
     @pytest.mark.asyncio
     async def test_no_limit_returns_all(self, settings):
         now = datetime.now(UTC)
+        titles_urls = [
+            ("OpenAI releases new AI model", "https://bbc.com/openai-releases-new-ai-model"),
+            ("DeepMind AI safety research update", "https://bbc.com/deepmind-ai-safety-research-update"),
+            ("Google Gemini AI launch details", "https://bbc.com/google-gemini-ai-launch-details"),
+            ("Anthropic Claude AI breakthrough", "https://bbc.com/anthropic-claude-ai-breakthrough"),
+            ("Microsoft Copilot AI expansion", "https://bbc.com/microsoft-copilot-ai-expansion"),
+        ]
         articles = [
-            make_article(title=f"Art {i}", url=f"https://bbc.com/{i}", source_name="BBC News", published_at=now - timedelta(hours=i))
-            for i in range(5)
+            make_article(title=t, url=u, source_name="BBC News", published_at=now - timedelta(hours=i))
+            for i, (t, u) in enumerate(titles_urls)
         ]
 
         sources = [FakeSource("test", articles)]

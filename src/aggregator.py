@@ -30,6 +30,53 @@ def _is_ai_relevant(article: Article) -> bool:
     return _AI_RELEVANCE_RE.search(text) is not None
 
 
+# Words too common or too short to be meaningful for title-URL matching.
+_STOP_WORDS = frozenset(
+    "a an and are as at be by for from has have how in is it its of on or "
+    "that the this to was were will with new not but can do say says said "
+    "could would should what who why where when may also over after all".split()
+)
+
+_SLUG_SPLIT_RE = re.compile(r"[\W_]+")
+
+
+def _title_matches_url(article: Article) -> bool:
+    """Check that meaningful words from the title appear in the URL path.
+
+    Legitimate news URLs typically contain a slugified version of the title.
+    This filters out articles where the search matched sidebar content but
+    the actual page is about something else.
+
+    Google News RSS wraps URLs through news.google.com/rss/articles/..., so
+    we skip this check for those URLs.
+    """
+    url = article.url
+    # Skip check for Google News redirect URLs — they don't contain the slug
+    if "news.google.com" in url:
+        return True
+
+    path = urlparse(url).path.lower()
+    title_words = {
+        w.lower()
+        for w in re.findall(r"[a-zA-Z]{3,}", article.title)
+        if w.lower() not in _STOP_WORDS
+    }
+
+    if not title_words:
+        return True  # Can't validate — allow through
+
+    matches = sum(1 for w in title_words if w in path)
+    # At least 30% of meaningful title words should appear in the URL
+    return matches >= max(1, len(title_words) * 0.3)
+
+
+def _normalize_title(title: str) -> str:
+    """Normalize a title for deduplication: lowercase, strip punctuation, collapse spaces."""
+    title = title.lower().strip()
+    title = re.sub(r"[^\w\s]", "", title)
+    return re.sub(r"\s+", " ", title)
+
+
 _DOMAIN_TO_NAME = {
     "reuters.com": "Reuters",
     "apnews.com": "AP News",
@@ -147,6 +194,7 @@ class NewsAggregator:
         ]
 
         articles = self._deduplicate(articles)
+        articles = [a for a in articles if _title_matches_url(a)]
         articles = [a for a in articles if _is_ai_relevant(a)]
         articles = self._mark_credibility(articles)
 
@@ -205,14 +253,18 @@ class NewsAggregator:
         )
 
     def _deduplicate(self, articles: list[Article]) -> list[Article]:
-        """Remove duplicates based on normalized URL."""
-        seen: set[str] = set()
+        """Remove duplicates based on normalized URL and normalized title."""
+        seen_urls: set[str] = set()
+        seen_titles: set[str] = set()
         unique: list[Article] = []
         for article in articles:
-            key = self._normalize_url(article.url)
-            if key not in seen:
-                seen.add(key)
-                unique.append(article)
+            url_key = self._normalize_url(article.url)
+            title_key = _normalize_title(article.title)
+            if url_key in seen_urls or title_key in seen_titles:
+                continue
+            seen_urls.add(url_key)
+            seen_titles.add(title_key)
+            unique.append(article)
         return unique
 
     def _normalize_url(self, url: str) -> str:
