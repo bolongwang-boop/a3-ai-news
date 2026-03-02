@@ -1,0 +1,357 @@
+{
+  "info": {
+    "name": "AI News API",
+    "description": "Collection for the AI News aggregation API. Fetches AI-related news from multiple sources (NewsAPI, Google News RSS), with filtering, deduplication, and Slack formatting.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["health"]
+            },
+            "description": "Returns the health status of the API and whether the database is enabled."
+          },
+          "response": [
+            {
+              "name": "Healthy (DB disabled)",
+              "originalRequest": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/health",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["health"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"status\": \"ok\",\n  \"database\": \"disabled\"\n}"
+            },
+            {
+              "name": "Healthy (DB enabled)",
+              "originalRequest": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/health",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["health"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"status\": \"ok\",\n  \"database\": \"enabled\"\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "News",
+      "item": [
+        {
+          "name": "Get AI News",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/news/ai?days=7&credible_only=true&limit=5",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "news", "ai"],
+              "query": [
+                {
+                  "key": "days",
+                  "value": "7",
+                  "description": "Days to look back from now (Sydney time). Range: 1-30. Default: 7."
+                },
+                {
+                  "key": "credible_only",
+                  "value": "true",
+                  "description": "Only return articles from credible/whitelisted sources. Default: true."
+                },
+                {
+                  "key": "limit",
+                  "value": "5",
+                  "description": "Maximum articles to return. Range: 1-500. Omit for all."
+                },
+                {
+                  "key": "max_results",
+                  "value": "100",
+                  "description": "Maximum articles to fetch from each news source before filtering. Range: 1-500. Default: 100.",
+                  "disabled": true
+                },
+                {
+                  "key": "source",
+                  "value": "live",
+                  "description": "Data source: 'live' fetches from news APIs, 'cached' reads from database. Default: live.",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Retrieve AI news articles published in the last N days (Australia/Sydney timezone). Returns structured JSON with article metadata."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "originalRequest": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/news/ai?days=7&credible_only=true&limit=5",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "v1", "news", "ai"],
+                  "query": [
+                    { "key": "days", "value": "7" },
+                    { "key": "credible_only", "value": "true" },
+                    { "key": "limit", "value": "5" }
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"total_articles\": 5,\n  \"query\": \"AI news (last week, Sydney time)\",\n  \"from_date_sydney\": \"2026-02-23\",\n  \"to_date_sydney\": \"2026-03-02\",\n  \"sources_queried\": [\"NewsAPI\", \"Google News\"],\n  \"articles\": [\n    {\n      \"title\": \"Example AI Article Title\",\n      \"description\": \"A brief description of the article.\",\n      \"url\": \"https://example.com/article\",\n      \"published_at\": \"2026-03-02T10:30:00+00:00\",\n      \"published_at_sydney\": \"2026-03-02T21:30:00+11:00\",\n      \"source\": {\n        \"name\": \"TechCrunch\",\n        \"url\": \"https://techcrunch.com\",\n        \"is_credible\": true\n      },\n      \"image_url\": \"https://example.com/image.jpg\",\n      \"fetched_from\": \"NewsAPI\"\n    }\n  ]\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get AI News (Cached)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/news/ai?days=7&credible_only=true&limit=10&source=cached",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "news", "ai"],
+              "query": [
+                {
+                  "key": "days",
+                  "value": "7",
+                  "description": "Days to look back from now (Sydney time). Range: 1-30. Default: 7."
+                },
+                {
+                  "key": "credible_only",
+                  "value": "true",
+                  "description": "Only return articles from credible/whitelisted sources. Default: true."
+                },
+                {
+                  "key": "limit",
+                  "value": "10",
+                  "description": "Maximum articles to return. Range: 1-500. Omit for all."
+                },
+                {
+                  "key": "source",
+                  "value": "cached",
+                  "description": "Read from database instead of fetching live from news APIs."
+                }
+              ]
+            },
+            "description": "Retrieve AI news from the database cache. Requires AINEWS_ENABLE_PERSISTENCE=true and a configured PostgreSQL database."
+          },
+          "response": []
+        },
+        {
+          "name": "Get AI News (All Params)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/news/ai?days=14&credible_only=false&limit=50&max_results=200&source=live",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "news", "ai"],
+              "query": [
+                {
+                  "key": "days",
+                  "value": "14",
+                  "description": "Days to look back from now (Sydney time). Range: 1-30. Default: 7."
+                },
+                {
+                  "key": "credible_only",
+                  "value": "false",
+                  "description": "Include articles from all sources, not just credible ones."
+                },
+                {
+                  "key": "limit",
+                  "value": "50",
+                  "description": "Maximum articles to return. Range: 1-500."
+                },
+                {
+                  "key": "max_results",
+                  "value": "200",
+                  "description": "Maximum articles to fetch from each news source before filtering. Range: 1-500."
+                },
+                {
+                  "key": "source",
+                  "value": "live",
+                  "description": "Data source: 'live' fetches from news APIs."
+                }
+              ]
+            },
+            "description": "Retrieve AI news with all parameters explicitly set. Includes non-credible sources, extended lookback, and higher limits."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Slack Formatted News",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/news/slack?days=7&credible_only=true&limit=5",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "news", "slack"],
+              "query": [
+                {
+                  "key": "days",
+                  "value": "7",
+                  "description": "Days to look back from now (Sydney time). Range: 1-30. Default: 7."
+                },
+                {
+                  "key": "credible_only",
+                  "value": "true",
+                  "description": "Only return articles from credible/whitelisted sources. Default: true."
+                },
+                {
+                  "key": "limit",
+                  "value": "5",
+                  "description": "Maximum articles to return. Range: 1-500. Omit for all."
+                },
+                {
+                  "key": "max_results",
+                  "value": "100",
+                  "description": "Maximum articles to fetch from each news source before filtering. Range: 1-500. Default: 100.",
+                  "disabled": true
+                },
+                {
+                  "key": "source",
+                  "value": "live",
+                  "description": "Data source: 'live' fetches from news APIs, 'cached' reads from database. Default: live.",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Returns AI news formatted as a Slack Block Kit JSON payload, ready to POST to a Slack webhook or use in automation pipelines (e.g. n8n)."
+          },
+          "response": [
+            {
+              "name": "Slack Block Kit Response",
+              "originalRequest": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/news/slack?days=7&credible_only=true&limit=5",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "v1", "news", "slack"],
+                  "query": [
+                    { "key": "days", "value": "7" },
+                    { "key": "credible_only", "value": "true" },
+                    { "key": "limit", "value": "5" }
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"blocks\": [\n    {\n      \"type\": \"header\",\n      \"text\": {\n        \"type\": \"plain_text\",\n        \"text\": \":newspaper: AI News Digest -- 5 of 10 articles\",\n        \"emoji\": true\n      }\n    },\n    {\n      \"type\": \"context\",\n      \"elements\": [\n        {\n          \"type\": \"mrkdwn\",\n          \"text\": \"*Period:* 2026-02-23 -- 2026-03-02  |  Credible sources only\"\n        }\n      ]\n    },\n    {\n      \"type\": \"divider\"\n    },\n    {\n      \"type\": \"section\",\n      \"text\": {\n        \"type\": \"mrkdwn\",\n        \"text\": \"*<https://example.com/article|Example AI Article Title>*\\n_TechCrunch_  |  2026-03-02T21:30:00+11:00\"\n      },\n      \"accessory\": {\n        \"type\": \"image\",\n        \"image_url\": \"https://example.com/image.jpg\",\n        \"alt_text\": \"Example AI Article Title\"\n      }\n    },\n    {\n      \"type\": \"context\",\n      \"elements\": [\n        {\n          \"type\": \"mrkdwn\",\n          \"text\": \"A brief description of the article.\"\n        }\n      ]\n    }\n  ]\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get News Sources",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/news/sources",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "news", "sources"]
+            },
+            "description": "List which news sources are configured and available, plus database statistics if persistence is enabled."
+          },
+          "response": [
+            {
+              "name": "Sources (DB disabled)",
+              "originalRequest": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/news/sources",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "v1", "news", "sources"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"sources\": [\n    {\n      \"name\": \"NewsAPI\",\n      \"available\": true\n    },\n    {\n      \"name\": \"Google News\",\n      \"available\": true\n    }\n  ],\n  \"database_enabled\": false,\n  \"database_stats\": null\n}"
+            },
+            {
+              "name": "Sources (DB enabled)",
+              "originalRequest": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/news/sources",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "v1", "news", "sources"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"sources\": [\n    {\n      \"name\": \"NewsAPI\",\n      \"available\": true\n    },\n    {\n      \"name\": \"Google News\",\n      \"available\": true\n    }\n  ],\n  \"database_enabled\": true,\n  \"database_stats\": {\n    \"total_articles\": 1250,\n    \"credible_articles\": 980,\n    \"oldest_article\": \"2026-02-01T12:00:00+00:00\",\n    \"newest_article\": \"2026-03-02T20:00:00+00:00\"\n  }\n}"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
