@@ -11,7 +11,7 @@ DB_NAME      := ai_news
 DB_USER      := ainews
 DB_PORT      := 5432
 
-.PHONY: local test lint fmt news clean help db db-proxy
+.PHONY: local test lint fmt news clean help db db-proxy api-health api-news api-slack api-sources
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
@@ -50,6 +50,20 @@ db: ## Connect to Cloud SQL via Auth Proxy + psql
 	sleep 2; \
 	psql "host=127.0.0.1 port=$(DB_PORT) dbname=$(DB_NAME) user=$(DB_USER)"; \
 	kill $$PROXY_PID 2>/dev/null
+
+API_URL := http://localhost:8080
+
+api-health: ## Hit GET /health
+	@curl -s $(API_URL)/health | python3 -m json.tool
+
+api-news: ## Hit GET /api/v1/news/ai
+	@curl -s "$(API_URL)/api/v1/news/ai?days=7&credible_only=true&limit=5" | python3 -m json.tool
+
+api-slack: ## Hit GET /api/v1/news/slack
+	@curl -s "$(API_URL)/api/v1/news/slack?days=7&credible_only=true&limit=5" | python3 -m json.tool
+
+api-sources: ## Hit GET /api/v1/news/sources
+	@curl -s $(API_URL)/api/v1/news/sources | python3 -m json.tool
 
 clean: ## Remove venv and caches
 	rm -rf $(VENV) .pytest_cache .ruff_cache __pycache__ src/__pycache__
