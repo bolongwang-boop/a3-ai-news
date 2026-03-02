@@ -54,16 +54,16 @@ db: ## Connect to Cloud SQL via Auth Proxy + psql
 API_URL := http://localhost:8080
 
 api-health: ## Hit GET /health
-	@curl -s $(API_URL)/health | python3 -m json.tool
+	@curl -sf $(API_URL)/health | python3 -m json.tool || echo "Error: is the server running? Start it with: make local"
 
 api-news: ## Hit GET /api/v1/news/ai
-	@curl -s "$(API_URL)/api/v1/news/ai?days=7&credible_only=true&limit=5" | python3 -m json.tool
+	@curl -sf "$(API_URL)/api/v1/news/ai?days=7&credible_only=true&limit=5" | python3 -m json.tool || echo "Error: is the server running? Start it with: make local"
 
 api-slack: ## Hit GET /api/v1/news/slack
-	@curl -s "$(API_URL)/api/v1/news/slack?days=7&credible_only=true&limit=5" | python3 -m json.tool
+	@curl -sf "$(API_URL)/api/v1/news/slack?days=7&credible_only=true&limit=5" | python3 -m json.tool || echo "Error: is the server running? Start it with: make local"
 
 api-sources: ## Hit GET /api/v1/news/sources
-	@curl -s $(API_URL)/api/v1/news/sources | python3 -m json.tool
+	@curl -sf $(API_URL)/api/v1/news/sources | python3 -m json.tool || echo "Error: is the server running? Start it with: make local"
 
 clean: ## Remove venv and caches
 	rm -rf $(VENV) .pytest_cache .ruff_cache __pycache__ src/__pycache__

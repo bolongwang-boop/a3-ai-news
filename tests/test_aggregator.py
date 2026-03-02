@@ -93,6 +93,38 @@ class TestDeduplication:
         result = agg._deduplicate(articles)
         assert len(result) == 1
 
+    def test_removes_fuzzy_duplicate_titles_across_sources(self, settings):
+        """Same story from different sources with slightly different titles."""
+        articles = [
+            make_article(
+                title="OpenAI releases GPT-5",
+                url="https://openai.com/blog/gpt-5",
+            ),
+            make_article(
+                title="OpenAI releases GPT-5, its most powerful model yet",
+                url="https://techcrunch.com/openai-releases-gpt-5-powerful-model",
+            ),
+        ]
+        agg = NewsAggregator(sources=[], settings=settings)
+        result = agg._deduplicate(articles)
+        assert len(result) == 1
+
+    def test_keeps_different_stories(self, settings):
+        """Genuinely different stories should not be merged."""
+        articles = [
+            make_article(
+                title="OpenAI releases GPT-5",
+                url="https://openai.com/blog/gpt-5",
+            ),
+            make_article(
+                title="Google DeepMind launches Gemini Ultra",
+                url="https://deepmind.google/gemini-ultra",
+            ),
+        ]
+        agg = NewsAggregator(sources=[], settings=settings)
+        result = agg._deduplicate(articles)
+        assert len(result) == 2
+
 
 class TestCredibilityMarking:
     def test_marks_credible_by_domain(self, settings):

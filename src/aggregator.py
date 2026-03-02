@@ -77,6 +77,31 @@ def _normalize_title(title: str) -> str:
     return re.sub(r"\s+", " ", title)
 
 
+def _title_keywords(title: str) -> set[str]:
+    """Extract meaningful keywords from a title for fuzzy matching."""
+    return {
+        w.lower()
+        for w in re.findall(r"[a-zA-Z]{3,}", title)
+        if w.lower() not in _STOP_WORDS
+    }
+
+
+def _is_similar_title(keywords_a: set[str], keywords_b: set[str]) -> bool:
+    """Check if two titles are similar enough to be the same story.
+
+    Uses word overlap: if 70%+ of the shorter title's keywords appear
+    in the longer title, they are considered duplicates. This catches
+    cross-source duplicates like:
+      - "OpenAI releases GPT-5" (NewsAPI)
+      - "OpenAI releases GPT-5, its most powerful model yet" (Google RSS)
+    """
+    if not keywords_a or not keywords_b:
+        return False
+    shorter, longer = sorted([keywords_a, keywords_b], key=len)
+    overlap = len(shorter & longer)
+    return overlap >= max(2, len(shorter) * 0.7)
+
+
 _DOMAIN_TO_NAME = {
     "reuters.com": "Reuters",
     "apnews.com": "AP News",
@@ -253,17 +278,23 @@ class NewsAggregator:
         )
 
     def _deduplicate(self, articles: list[Article]) -> list[Article]:
-        """Remove duplicates based on normalized URL and normalized title."""
+        """Remove duplicates based on normalized URL, exact title, and fuzzy title similarity."""
         seen_urls: set[str] = set()
         seen_titles: set[str] = set()
+        seen_keywords: list[set[str]] = []
         unique: list[Article] = []
         for article in articles:
             url_key = self._normalize_url(article.url)
             title_key = _normalize_title(article.title)
             if url_key in seen_urls or title_key in seen_titles:
                 continue
+            # Fuzzy check: same story with slightly different titles across sources
+            kw = _title_keywords(article.title)
+            if any(_is_similar_title(kw, existing) for existing in seen_keywords):
+                continue
             seen_urls.add(url_key)
             seen_titles.add(title_key)
+            seen_keywords.append(kw)
             unique.append(article)
         return unique
 
