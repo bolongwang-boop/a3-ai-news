@@ -2,8 +2,8 @@ from enum import Enum
 
 from fastapi import APIRouter, Query, Request
 
-from src.formatters.slack import format_articles_for_slack
-from src.models import NewsResponse
+from src.formatters.slack import format_articles_for_slack, format_digest_for_slack
+from src.models import DigestResponse, NewsResponse
 
 router = APIRouter(prefix="/api/v1", tags=["news"])
 
@@ -16,11 +16,29 @@ class NewsSource(str, Enum):
 @router.get("/news/ai", response_model=NewsResponse)
 async def get_ai_news(
     request: Request,
-    days: int = Query(default=7, ge=1, le=30, description="Days to look back from now (Sydney time)"),
-    credible_only: bool = Query(default=True, description="Only return articles from credible/authenticated sources"),
-    limit: int | None = Query(default=None, ge=1, le=500, description="Maximum articles to return. Omit to return all."),
-    max_results: int = Query(default=100, ge=1, le=500, description="Maximum articles to fetch from each news source before filtering"),
-    source: NewsSource = Query(default=NewsSource.live, description="'live' fetches from news APIs; 'cached' reads from database"),
+    days: int = Query(
+        default=7, ge=1, le=30, description="Days to look back from now (Sydney time)"
+    ),
+    credible_only: bool = Query(
+        default=True,
+        description="Only return articles from credible/authenticated sources",
+    ),
+    limit: int | None = Query(
+        default=None,
+        ge=1,
+        le=500,
+        description="Maximum articles to return. Omit to return all.",
+    ),
+    max_results: int = Query(
+        default=100,
+        ge=1,
+        le=500,
+        description="Maximum articles to fetch from each news source before filtering",
+    ),
+    source: NewsSource = Query(
+        default=NewsSource.live,
+        description="'live' fetches from news APIs; 'cached' reads from database",
+    ),
 ) -> NewsResponse:
     """Retrieve AI news published in the last N days (Australia/Sydney timezone).
 
@@ -52,11 +70,29 @@ async def get_ai_news(
 @router.get("/news/slack")
 async def get_ai_news_slack(
     request: Request,
-    days: int = Query(default=7, ge=1, le=30, description="Days to look back from now (Sydney time)"),
-    credible_only: bool = Query(default=True, description="Only return articles from credible/authenticated sources"),
-    limit: int | None = Query(default=None, ge=1, le=500, description="Maximum articles to return. Omit to return all."),
-    max_results: int = Query(default=100, ge=1, le=500, description="Maximum articles to fetch from each news source before filtering"),
-    source: NewsSource = Query(default=NewsSource.live, description="'live' fetches from news APIs; 'cached' reads from database"),
+    days: int = Query(
+        default=7, ge=1, le=30, description="Days to look back from now (Sydney time)"
+    ),
+    credible_only: bool = Query(
+        default=True,
+        description="Only return articles from credible/authenticated sources",
+    ),
+    limit: int | None = Query(
+        default=None,
+        ge=1,
+        le=500,
+        description="Maximum articles to return. Omit to return all.",
+    ),
+    max_results: int = Query(
+        default=100,
+        ge=1,
+        le=500,
+        description="Maximum articles to fetch from each news source before filtering",
+    ),
+    source: NewsSource = Query(
+        default=NewsSource.live,
+        description="'live' fetches from news APIs; 'cached' reads from database",
+    ),
 ) -> dict:
     """Return AI news formatted as Slack Block Kit JSON.
 
@@ -91,6 +127,49 @@ async def get_ai_news_slack(
     )
 
 
+@router.get("/news/digest", response_model=DigestResponse)
+async def get_ai_news_digest(
+    request: Request,
+    days: int = Query(
+        default=7, ge=1, le=30, description="Days to look back from now (Sydney time)"
+    ),
+    items: int = Query(
+        default=10, ge=1, le=20, description="Number of curated items to return"
+    ),
+) -> DigestResponse:
+    """Return a curated, category-balanced AI news digest.
+
+    Fetches articles from multiple sources using both general and targeted
+    queries, then selects exactly N items (default 10) balanced across
+    content categories: product launches, business & adoption, productivity
+    tools, industry news, security/risk, and Gemini/n8n.
+
+    No URLs are included in the response — designed for summary consumption.
+    """
+    aggregator = request.app.state.aggregator
+    return await aggregator.fetch_curated_digest(days_back=days, total_items=items)
+
+
+@router.get("/news/digest/slack")
+async def get_ai_news_digest_slack(
+    request: Request,
+    days: int = Query(
+        default=7, ge=1, le=30, description="Days to look back from now (Sydney time)"
+    ),
+    items: int = Query(
+        default=10, ge=1, le=20, description="Number of curated items to return"
+    ),
+) -> dict:
+    """Return a curated AI news digest formatted as Slack Block Kit JSON.
+
+    Same curated, category-balanced selection as /news/digest, formatted
+    for direct posting to a Slack webhook from n8n or any HTTP client.
+    """
+    aggregator = request.app.state.aggregator
+    digest = await aggregator.fetch_curated_digest(days_back=days, total_items=items)
+    return format_digest_for_slack(digest)
+
+
 @router.get("/news/sources")
 async def get_available_sources(request: Request) -> dict:
     """List which news sources are currently configured and available."""
@@ -98,8 +177,7 @@ async def get_available_sources(request: Request) -> dict:
 
     result: dict = {
         "sources": [
-            {"name": s.name, "available": s.is_available()}
-            for s in aggregator._sources
+            {"name": s.name, "available": s.is_available()} for s in aggregator._sources
         ],
         "database_enabled": aggregator._repository is not None,
     }

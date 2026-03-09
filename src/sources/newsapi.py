@@ -77,9 +77,66 @@ class NewsAPISource(NewsSource):
             if not published_str:
                 continue
 
-            published_at = datetime.fromisoformat(
-                published_str.replace("Z", "+00:00")
+            published_at = datetime.fromisoformat(published_str.replace("Z", "+00:00"))
+
+            source_name = (item.get("source") or {}).get("name", "Unknown")
+
+            articles.append(
+                Article(
+                    title=item.get("title", ""),
+                    description=item.get("description"),
+                    url=item.get("url", ""),
+                    published_at=published_at,
+                    published_at_sydney=utc_to_sydney_str(published_at),
+                    source=ArticleSource(name=source_name),
+                    image_url=item.get("urlToImage"),
+                    fetched_from=self.name,
+                )
             )
+
+        return articles
+
+    async def fetch_targeted_news(
+        self,
+        query: str,
+        from_date: datetime,
+        to_date: datetime,
+        max_results: int = 20,
+    ) -> list[Article]:
+        if not self.is_available():
+            return []
+
+        params = {
+            "q": query,
+            "from": from_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "to": to_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "sortBy": "publishedAt",
+            "language": "en",
+            "pageSize": min(max_results, 100),
+            "apiKey": self._api_key,
+        }
+
+        try:
+            resp = await self._http_client.get(self.BASE_URL, params=params)
+            resp.raise_for_status()
+            data = resp.json()
+        except httpx.HTTPStatusError as e:
+            logger.error("NewsAPI targeted HTTP error: %s", e.response.text)
+            return []
+        except httpx.RequestError as e:
+            logger.error("NewsAPI targeted request error: %s", e)
+            return []
+
+        if data.get("status") != "ok":
+            return []
+
+        articles: list[Article] = []
+        for item in data.get("articles", []):
+            published_str = item.get("publishedAt")
+            if not published_str:
+                continue
+
+            published_at = datetime.fromisoformat(published_str.replace("Z", "+00:00"))
 
             source_name = (item.get("source") or {}).get("name", "Unknown")
 

@@ -3,10 +3,21 @@ import logging
 import re
 from urllib.parse import urlparse
 
+from src.categories import (
+    CATEGORY_LABELS,
+    CATEGORY_QUOTAS,
+    Category,
+    OVERFLOW_PRIORITY,
+    classify_article,
+)
 from src.config import Settings
-from src.models import Article, NewsResponse
+from src.models import Article, CuratedArticle, DigestResponse, NewsResponse
 from src.sources.base import NewsSource
-from src.timezone import get_week_range_sydney, is_within_sydney_range, utc_to_sydney_str
+from src.timezone import (
+    get_week_range_sydney,
+    is_within_sydney_range,
+    utc_to_sydney_str,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -199,7 +210,9 @@ class NewsAggregator:
         from_utc, to_utc = get_week_range_sydney(days_back)
 
         active = self.available_sources
-        tasks = [s.fetch_ai_news(from_utc, to_utc, max_results=max_results) for s in active]
+        tasks = [
+            s.fetch_ai_news(from_utc, to_utc, max_results=max_results) for s in active
+        ]
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
         all_articles: list[Article] = []
@@ -214,7 +227,8 @@ class NewsAggregator:
 
         # Server-side re-validation of published date
         articles = [
-            a for a in all_articles
+            a
+            for a in all_articles
             if is_within_sydney_range(a.published_at, from_utc, to_utc)
         ]
 
@@ -276,6 +290,153 @@ class NewsAggregator:
             sources_queried=["database"],
             articles=articles,
         )
+
+    # Targeted queries to boost coverage for specific categories.
+    _TARGETED_QUERIES: list[str] = [
+        # Gemini / n8n
+        '"Gemini" OR "Vertex AI" OR "Google AI Studio" OR "n8n" OR "n8n.io"',
+        # Security / Risk
+        (
+            '"AI security" OR "AI vulnerability" OR "deepfake" '
+            'OR "prompt injection" OR "AI safety" OR "AI threat"'
+        ),
+        # Productivity Tools
+        (
+            '"AI" AND ("Asana" OR "Notion" OR "Slack" OR "Google Workspace" '
+            'OR "Microsoft 365" OR "GitHub Copilot" OR "Cursor")'
+        ),
+    ]
+
+    async def fetch_curated_digest(
+        self,
+        days_back: int = 7,
+        total_items: int = 10,
+    ) -> DigestResponse:
+        """Fetch and curate exactly N (default 10) AI news items, balanced by category.
+
+        Steps:
+        1. Fetch articles from all sources (general + targeted queries).
+        2. Deduplicate, filter, mark credibility (credible only).
+        3. Classify each article into a content category.
+        4. Select articles per category according to quota.
+        5. Return exactly total_items articles.
+        """
+        from_utc, to_utc = get_week_range_sydney(days_back)
+
+        # 1. Fetch general + targeted queries concurrently
+        active = self.available_sources
+        tasks = []
+
+        # General AI query from all sources
+        for source in active:
+            tasks.append(source.fetch_ai_news(from_utc, to_utc, max_results=100))
+
+        # Targeted queries from all sources
+        for source in active:
+            for query in self._TARGETED_QUERIES:
+                tasks.append(
+                    source.fetch_targeted_news(query, from_utc, to_utc, max_results=20)
+                )
+
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        all_articles: list[Article] = []
+        sources_queried: list[str] = list({s.name for s in active})
+
+        for result in results:
+            if isinstance(result, BaseException):
+                logger.error("Source query failed: %s", result)
+                continue
+            all_articles.extend(result)
+
+        # 2. Filter pipeline (same as fetch_weekly_ai_news)
+        articles = [
+            a
+            for a in all_articles
+            if is_within_sydney_range(a.published_at, from_utc, to_utc)
+        ]
+        articles = self._deduplicate(articles)
+        articles = [a for a in articles if _title_matches_url(a)]
+        articles = [a for a in articles if _is_ai_relevant(a)]
+        articles = self._mark_credibility(articles)
+        articles = [a for a in articles if a.source.is_credible]
+        articles.sort(key=lambda a: a.published_at, reverse=True)
+
+        # 3. Classify into categories
+        categorized: dict[Category, list[Article]] = {c: [] for c in Category}
+        for article in articles:
+            cat = classify_article(article)
+            categorized[cat].append(article)
+
+        # 4. Select per-category quota
+        selected = self._select_by_quota(categorized, total_items)
+
+        # 5. Build curated items
+        items: list[CuratedArticle] = []
+        for rank, (cat, article) in enumerate(selected, 1):
+            items.append(
+                CuratedArticle(
+                    rank=rank,
+                    category=cat.value,
+                    category_label=CATEGORY_LABELS[cat],
+                    title=article.title,
+                    description=article.description,
+                    source_name=article.source.name,
+                    published_at_sydney=article.published_at_sydney,
+                )
+            )
+
+        return DigestResponse(
+            total_items=len(items),
+            from_date_sydney=utc_to_sydney_str(from_utc),
+            to_date_sydney=utc_to_sydney_str(to_utc),
+            sources_queried=sources_queried,
+            items=items,
+        )
+
+    def _select_by_quota(
+        self,
+        categorized: dict[Category, list[Article]],
+        total: int,
+    ) -> list[tuple[Category, Article]]:
+        """Select articles balanced by category quotas.
+
+        If a category has fewer articles than its quota, the surplus
+        slots are redistributed to other categories in priority order.
+        """
+        selected: list[tuple[Category, Article]] = []
+        remaining_slots: dict[Category, int] = dict(CATEGORY_QUOTAS)
+
+        # First pass: fill each category up to its quota
+        for cat in Category:
+            quota = remaining_slots[cat]
+            available = categorized.get(cat, [])[:quota]
+            for article in available:
+                selected.append((cat, article))
+            remaining_slots[cat] = quota - len(available)
+
+        # Second pass: redistribute unfilled slots
+        surplus = sum(remaining_slots.values())
+        if surplus > 0 and len(selected) < total:
+            for cat in OVERFLOW_PRIORITY:
+                if surplus <= 0:
+                    break
+                already_used = sum(1 for c, _ in selected if c == cat)
+                available = categorized.get(cat, [])[already_used:]
+                for article in available:
+                    if surplus <= 0:
+                        break
+                    selected.append((cat, article))
+                    surplus -= 1
+
+        # Trim to total and sort by category order then recency
+        selected = selected[:total]
+        category_order = {c: i for i, c in enumerate(Category)}
+        selected.sort(
+            key=lambda x: (category_order[x[0]], -x[1].published_at.timestamp())
+        )
+
+        return selected
 
     def _deduplicate(self, articles: list[Article]) -> list[Article]:
         """Remove duplicates based on normalized URL, exact title, and fuzzy title similarity."""

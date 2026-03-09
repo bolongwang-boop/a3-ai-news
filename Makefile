@@ -11,7 +11,7 @@ DB_NAME      := ai_news
 DB_USER      := ainews
 DB_PORT      := 5432
 
-.PHONY: local test lint fmt news clean help db db-proxy api-health api-news api-slack api-sources
+.PHONY: local test lint fmt news clean help db db-proxy api-health api-news api-slack api-sources api-digest api-digest-slack
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
@@ -64,6 +64,12 @@ api-slack: ## Hit GET /api/v1/news/slack
 
 api-sources: ## Hit GET /api/v1/news/sources
 	@curl -sf $(API_URL)/api/v1/news/sources | python3 -m json.tool || echo "Error: is the server running? Start it with: make local"
+
+api-digest: ## Hit GET /api/v1/news/digest (curated top-10)
+	@curl -sf "$(API_URL)/api/v1/news/digest?days=7&items=10" | python3 -m json.tool || echo "Error: is the server running? Start it with: make local"
+
+api-digest-slack: ## Hit GET /api/v1/news/digest/slack (curated top-10 Slack)
+	@curl -sf "$(API_URL)/api/v1/news/digest/slack?days=7&items=10" | python3 -m json.tool || echo "Error: is the server running? Start it with: make local"
 
 clean: ## Remove venv and caches
 	rm -rf $(VENV) .pytest_cache .ruff_cache __pycache__ src/__pycache__
